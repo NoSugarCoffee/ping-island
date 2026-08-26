@@ -34,6 +34,32 @@ actor YabaiController {
         return await focusWindow(forWorkingDir: workingDirectory)
     }
 
+    /// Focus the terminal window for a given Claude PID (zellij).
+    /// Unlike the tmux path, this doesn't need a multiplexer-provided client
+    /// PID: it switches the zellij pane, then walks the process tree from
+    /// the Claude PID itself (the same technique the non-multiplexer
+    /// fallback already uses) to find the hosting terminal window.
+    func focusWindow(forZellijClaudePid claudePid: Int) async -> Bool {
+        guard await WindowFinder.shared.isYabaiAvailable() else {
+            return false
+        }
+
+        let windows = await WindowFinder.shared.getAllWindows()
+        let tree = ProcessTreeBuilder.shared.buildTree()
+
+        return await focusZellijInstance(claudePid: claudePid, tree: tree, windows: windows)
+    }
+
+    /// Focus the terminal window for a given working directory (zellij, fallback)
+    func focusWindow(forZellijWorkingDirectory workingDirectory: String) async -> Bool {
+        guard await WindowFinder.shared.isYabaiAvailable() else { return false }
+
+        let windows = await WindowFinder.shared.getAllWindows()
+        let tree = ProcessTreeBuilder.shared.buildTree()
+
+        return await focusZellijPane(forWorkingDir: workingDirectory, tree: tree, windows: windows)
+    }
+
     // MARK: - Private Implementation
 
     private func focusTmuxInstance(claudePid: Int, tree: [Int: ProcessInfo], windows: [YabaiWindow]) async -> Bool {
@@ -142,5 +168,57 @@ actor YabaiController {
         }
 
         return false
+    }
+
+    // MARK: - Zellij Helpers
+
+    private func focusZellijInstance(claudePid: Int, tree: [Int: ProcessInfo], windows: [YabaiWindow]) async -> Bool {
+        guard let target = await ZellijController.shared.findZellijTarget(forClaudePid: claudePid) else {
+            return false
+        }
+
+        _ = await ZellijController.shared.switchToPane(target: target)
+
+        if let terminalPid = findZellijClientTerminal(forClaudePid: claudePid, tree: tree, windows: windows) {
+            return await WindowFocuser.shared.focusTmuxWindow(terminalPid: terminalPid, windows: windows)
+        }
+
+        return false
+    }
+
+    /// Resolves the OS-level terminal PID hosting a given (zellij-backed)
+    /// Claude process by walking its parent chain -- zellij's own
+    /// `list-clients` only exposes an internal client id, not a real PID,
+    /// so this can't mirror findTmuxClientTerminal's client-PID lookup.
+    private func findZellijClientTerminal(forClaudePid claudePid: Int, tree: [Int: ProcessInfo], windows: [YabaiWindow]) -> Int? {
+        guard let terminalPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: claudePid, tree: tree) else {
+            return nil
+        }
+
+        let windowPids = Set(windows.map { $0.pid })
+        return windowPids.contains(terminalPid) ? terminalPid : nil
+    }
+
+    private func focusZellijPane(forWorkingDir workingDir: String, tree: [Int: ProcessInfo], windows: [YabaiWindow]) async -> Bool {
+        guard let target = await ZellijController.shared.findZellijTarget(forWorkingDirectory: workingDir) else {
+            return false
+        }
+
+        _ = await ZellijController.shared.switchToPane(target: target)
+
+        // Find a Claude process in this pane's working directory to resolve
+        // the hosting terminal window (mirrors focusTmuxPane's descendant
+        // walk, but via cwd since zellij exposes no pane_pid to walk from).
+        for (pid, info) in tree {
+            guard info.command.lowercased().contains("claude") else { continue }
+            guard let cwd = ProcessTreeBuilder.shared.getWorkingDirectory(forPid: pid), cwd == workingDir else { continue }
+
+            if let terminalPid = findZellijClientTerminal(forClaudePid: pid, tree: tree, windows: windows) {
+                return await WindowFocuser.shared.focusTmuxWindow(terminalPid: terminalPid, windows: windows)
+            }
+            return true
+        }
+
+        return true
     }
 }

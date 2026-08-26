@@ -43,12 +43,9 @@ actor SessionLauncher {
             return true
         }
 
-        if session.isInZellij {
-            // Unlike tmux, zellij exposes no client-to-OS-PID mapping we can
-            // walk to find the hosting terminal app, so this only switches
-            // the notch's target pane; the generic terminal-app activation
-            // steps below still do the actual window raise.
-            await focusZellijPaneIfPossible(session)
+        if session.isInZellij, await activateZellijSession(session) {
+            Self.logger.debug("Activated zellij session \(session.sessionId, privacy: .public)")
+            return true
         }
 
         if session.isRemoteSession,
@@ -310,16 +307,37 @@ actor SessionLauncher {
         return false
     }
 
-    private func focusZellijPaneIfPossible(_ session: SessionState) async {
+    private func activateZellijSession(_ session: SessionState) async -> Bool {
+        if await WindowFinder.shared.isYabaiAvailable() {
+            if let pid = session.pid,
+               await YabaiController.shared.focusWindow(forZellijClaudePid: pid) {
+                return true
+            }
+
+            if await YabaiController.shared.focusWindow(forZellijWorkingDirectory: session.cwd) {
+                return true
+            }
+        }
+
+        let tree = ProcessTreeBuilder.shared.buildTree()
+
         if let pid = session.pid,
            let target = await ZellijController.shared.findZellijTarget(forClaudePid: pid) {
             _ = await ZellijController.shared.switchToPane(target: target)
-            return
+
+            if let terminalPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree) {
+                return await activateApplication(processIdentifier: terminalPid, activateAllWindows: false)
+            }
+
+            return true
         }
 
         if let target = await ZellijController.shared.findZellijTarget(forWorkingDirectory: session.cwd) {
             _ = await ZellijController.shared.switchToPane(target: target)
+            return true
         }
+
+        return false
     }
 
     private func shouldPrioritizeAppNavigation(for session: SessionState) -> Bool {
