@@ -735,24 +735,34 @@ class SessionMonitor: ObservableObject {
             return
         }
 
-        if session.supportsTmuxCLIMessaging {
-            guard let target = await findTmuxTarget(for: session) else {
-                throw NSError(
-                    domain: "PingIsland.SessionMonitor",
-                    code: 404,
-                    userInfo: [NSLocalizedDescriptionKey: "Could not find the terminal pane for this session."]
-                )
+        if session.supportsCLIMessaging {
+            if let target = await findTmuxTarget(for: session) {
+                guard await ToolApprovalHandler.shared.sendMessage(trimmed, to: target) else {
+                    throw NSError(
+                        domain: "PingIsland.SessionMonitor",
+                        code: 500,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to send the follow-up message to the terminal session."]
+                    )
+                }
+                return
             }
 
-            guard await ToolApprovalHandler.shared.sendMessage(trimmed, to: target) else {
-                throw NSError(
-                    domain: "PingIsland.SessionMonitor",
-                    code: 500,
-                    userInfo: [NSLocalizedDescriptionKey: "Failed to send the follow-up message to the terminal session."]
-                )
+            if let target = await findZellijTarget(for: session) {
+                guard await ZellijController.shared.sendMessage(trimmed, to: target) else {
+                    throw NSError(
+                        domain: "PingIsland.SessionMonitor",
+                        code: 500,
+                        userInfo: [NSLocalizedDescriptionKey: "Failed to send the follow-up message to the terminal session."]
+                    )
+                }
+                return
             }
 
-            return
+            throw NSError(
+                domain: "PingIsland.SessionMonitor",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "Could not find the terminal pane for this session."]
+            )
         }
 
         if session.provider == .codex,
@@ -765,29 +775,33 @@ class SessionMonitor: ObservableObject {
             return
         }
 
-        guard session.isInTmux, let tty = session.tty else {
-            throw NSError(
-                domain: "PingIsland.SessionMonitor",
-                code: 400,
-                userInfo: [NSLocalizedDescriptionKey: "Inline follow-up requires an active tmux-backed terminal session."]
-            )
+        if session.isInTmux, let tty = session.tty, let target = await findTmuxTarget(tty: tty) {
+            guard await ToolApprovalHandler.shared.sendMessage(trimmed, to: target) else {
+                throw NSError(
+                    domain: "PingIsland.SessionMonitor",
+                    code: 500,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to send the follow-up message to the terminal session."]
+                )
+            }
+            return
         }
 
-        guard let target = await findTmuxTarget(tty: tty) else {
-            throw NSError(
-                domain: "PingIsland.SessionMonitor",
-                code: 404,
-                userInfo: [NSLocalizedDescriptionKey: "Could not find the terminal pane for this session."]
-            )
+        if session.isInZellij, let target = await findZellijTarget(for: session) {
+            guard await ZellijController.shared.sendMessage(trimmed, to: target) else {
+                throw NSError(
+                    domain: "PingIsland.SessionMonitor",
+                    code: 500,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to send the follow-up message to the terminal session."]
+                )
+            }
+            return
         }
 
-        guard await ToolApprovalHandler.shared.sendMessage(trimmed, to: target) else {
-            throw NSError(
-                domain: "PingIsland.SessionMonitor",
-                code: 500,
-                userInfo: [NSLocalizedDescriptionKey: "Failed to send the follow-up message to the terminal session."]
-            )
-        }
+        throw NSError(
+            domain: "PingIsland.SessionMonitor",
+            code: 400,
+            userInfo: [NSLocalizedDescriptionKey: "Inline follow-up requires an active tmux- or zellij-backed terminal session."]
+        )
     }
 
     func sendNativeSessionInput(sessionId: String, text: String) {
@@ -982,6 +996,25 @@ class SessionMonitor: ObservableObject {
         }
 
         return nil
+    }
+
+    /// Find the zellij target for a session, preferring the identifiers
+    /// captured directly off the hook's environment (no subprocess calls)
+    /// before falling back to PID/cwd-based pane discovery.
+    private func findZellijTarget(for session: SessionState) async -> ZellijTarget? {
+        let sessionName = session.clientInfo.zellijSessionIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let paneID = session.clientInfo.zellijPaneIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let sessionName, !sessionName.isEmpty, let paneID, !paneID.isEmpty {
+            return ZellijTarget(session: sessionName, paneId: paneID)
+        }
+
+        if let pid = session.pid,
+           let target = await ZellijController.shared.findZellijTarget(forClaudePid: pid) {
+            return target
+        }
+
+        return await ZellijController.shared.findZellijTarget(forWorkingDirectory: session.cwd)
     }
 
     // MARK: - History Loading (for UI)

@@ -41,8 +41,11 @@ This file is a routing layer for coding agents working in this repo. Keep it sho
 - Codex ingress: `PingIsland/Services/Codex/`, `PingIsland/UI/Views/CodexSessionView.swift`
   - Hook-less fallback parsing for Codex sessions lives in `PingIsland/Services/Codex/CodexRolloutParser.swift`
   - The fallback parser tails append-only rollout JSONL incrementally, rebuilds after file replacement/truncation, skips pathological oversized records, and retains a bounded recent history. Keep the full content of each retained item, and do not return to whole-file reparsing for ordinary appends.
-- Terminal and focus control: `PingIsland/Services/Tmux/`, `PingIsland/Services/Window/`, `PingIsland/Utilities/TerminalVisibilityDetector.swift`
-  - Terminal focus flows currently cover iTerm2, Ghostty, Terminal.app, tmux, and IDE-hosted terminals
+- Terminal and focus control: `PingIsland/Services/Tmux/`, `PingIsland/Services/Zellij/`, `PingIsland/Services/Window/`, `PingIsland/Utilities/TerminalVisibilityDetector.swift`
+  - Terminal focus flows currently cover iTerm2, Ghostty, Terminal.app, tmux, zellij, and IDE-hosted terminals
+  - Approve/deny for Claude-compatible blocking-hook clients never needs tmux or zellij -- `HookSocketServer.respondToPermissionBySession` answers over the hook socket directly. The multiplexer services exist only for the two capabilities that have no socket equivalent: injecting a free-text follow-up into the running CLI (`ToolApprovalHandler` / `ZellijApprovalHandler`, driven by `SessionState.supportsCLIMessaging`), and jumping the notch's focus to the exact pane (`TmuxController.switchToPane` / `ZellijController.switchToPane`, driven by `SessionLauncher.activate`)
+  - Zellij mirrors the tmux quartet (`ZellijTarget`, `ZellijPathFinder`, `ZellijTargetFinder`, `ZellijController`, `ZellijApprovalHandler`, `ZellijSessionMatcher`) but differs in two structural ways: `zellij list-panes` carries no pane PID (target-finding resolves the caller's PID to a cwd via `ProcessTreeBuilder.getWorkingDirectory` and matches `pane_cwd` instead of tmux's PID-tree walk), and `list-panes`/`action` are scoped to one session at a time (`zellij --session <name> action ...`), so target-finding enumerates `zellij list-sessions` first rather than a single `list-panes -a`
+  - Known scope cut: `YabaiController`'s tmux path resolves the OS PID of the terminal client attached to a tmux session via `list-clients -F "#{client_pid}"`; zellij's `list-clients` only exposes an internal client id, not an OS PID, so there is no equivalent yabai-precision focus for zellij sessions today -- `SessionListView`'s yabai jump button stays tmux-gated (`session.isInTmux && isYabaiAvailable`)
 - Remote SSH forwarding and remote-host management: `PingIsland/Services/Remote/`
   - Remote hosts can bootstrap a bridge on the SSH target, rewrite remote hooks, install managed plugin-directory integrations such as Hermes under the remote home directory, and attach a bidirectional forwarding channel back into PingIsland
   - The remote bridge forwards recent Codex app-server thread activity from the SSH target's `~/.codex/state_*.sqlite` through the existing remote hook-event channel
@@ -111,6 +114,7 @@ This file is a routing layer for coding agents working in this repo. Keep it sho
 - If you change client mascot selection or mascot animations, trace through `PingIsland/Models/ClientProfile.swift`, `PingIsland/Core/Settings.swift`, `PingIsland/UI/Components/MascotView.swift`, and the mascot callsites in `NotchView`, `SessionListView`, `SessionHoverPreviewView`, and `MascotSettingsView` so runtime overrides and previews stay aligned.
 - If you change completion-result popup behavior, trace through `SessionStore`, `SessionMonitor`, `PingIsland/UI/Views/NotchView.swift`, and `PingIsland/UI/Views/SessionCompletionNotificationView.swift` so completion detection, queueing, and auto-dismiss timing stay aligned.
 - If you change tmux or terminal focusing, trace through `Services/Tmux`, `Services/Window`, and `TerminalVisibilityDetector`.
+- If you change zellij or terminal focusing, trace through `Services/Zellij`, `Services/Window`, and `TerminalVisibilityDetector`; keep `ZellijPathFinder`'s install-path list and `ZellijTargetFinder`'s cwd-based matching in sync with the tmux equivalents when their behavior changes.
 - If you change IDE terminal jump behavior, inspect both `TerminalSessionFocuser` and `IDEExtensionInstaller`, plus the integration settings UI so install state and URI schemes stay aligned.
 - If you change Codex behavior, verify both the monitor layer under `PingIsland/Services/Codex/` and the UI under `PingIsland/UI/Views/CodexSessionView.swift`.
   - Long Codex/subagent prompts, results, tool details, and retained transcript rows must keep their full item data in `SessionStore` / snapshots and apply bounded display text only at SwiftUI rendering boundaries. Prefer `SessionTextSanitizer.boundedDisplayText` for inline `Text` / Markdown content, add or preserve tests for truncation behavior, and avoid passing unbounded transcripts directly into expanded Island detail views.
@@ -178,7 +182,7 @@ This file is a routing layer for coding agents working in this repo. Keep it sho
 - If idle-session visibility changed, do sessions auto-hide after 30 minutes of inactivity and reappear when a new message or hook/app-server event arrives?
 - If detached Island behavior changed, can the docked notch still click-open normally, drag-detach from closed/opened states, and re-dock cleanly without duplicate windows?
 - If approval or intervention flows changed, do approve, deny, and answer paths still resolve cleanly?
-- If focus logic changed, does tmux and non-tmux behavior still degrade safely?
+- If focus logic changed, does tmux, zellij, and non-multiplexer behavior still degrade safely?
 - If release tooling changed, avoid running notarization or signing steps unless the task explicitly requires them.
 
 ## Current Reality

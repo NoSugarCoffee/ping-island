@@ -294,6 +294,7 @@ actor SessionStore {
             pid: existing?.pid,
             tty: existing?.tty,
             isInTmux: existing?.isInTmux ?? false,
+            isInZellij: existing?.isInZellij ?? false,
             autoApprovePermissions: existing?.autoApprovePermissions ?? false,
             phase: existing?.phase == .ended ? .idle : (existing?.phase ?? .idle),
             chatItems: existing?.chatItems ?? [],
@@ -344,6 +345,7 @@ actor SessionStore {
             pid: nil,
             tty: nil,
             isInTmux: false,
+            isInZellij: false,
             phase: .idle,
             createdAt: info.createdAt
         )
@@ -441,6 +443,7 @@ actor SessionStore {
         session.pid = event.pid
         if let pid = event.pid {
             session.isInTmux = ProcessTreeBuilder.shared.isInTmux(pid: pid, tree: tree)
+            session.isInZellij = ProcessTreeBuilder.shared.isInZellij(pid: pid, tree: tree)
         }
         if let tty = event.tty {
             session.tty = tty.replacingOccurrences(of: "/dev/", with: "")
@@ -840,6 +843,7 @@ actor SessionStore {
             pid: event.pid,
             tty: event.tty?.replacingOccurrences(of: "/dev/", with: ""),
             isInTmux: false,  // Will be updated
+            isInZellij: false,  // Will be updated
             phase: .idle
         )
     }
@@ -4561,6 +4565,7 @@ actor SessionStore {
             pid: previousSession.pid,
             tty: previousSession.tty,
             isInTmux: previousSession.isInTmux,
+            isInZellij: previousSession.isInZellij,
             phase: previousSession.phase,
             chatItems: previousSession.chatItems,
             toolTracker: previousSession.toolTracker,

@@ -27,9 +27,9 @@ actor SessionLauncher {
         guard !session.clientInfo.suppressesActivationNavigation else {
             return false
         }
-        Self.logger.debug("Activate request session=\(session.sessionId, privacy: .public) provider=\(String(describing: session.provider), privacy: .public) client=\(session.clientDisplayName, privacy: .public) pid=\(String(describing: session.pid), privacy: .public) tty=\(String(describing: session.tty), privacy: .public) inTmux=\(session.isInTmux)")
+        Self.logger.debug("Activate request session=\(session.sessionId, privacy: .public) provider=\(String(describing: session.provider), privacy: .public) client=\(session.clientDisplayName, privacy: .public) pid=\(String(describing: session.pid), privacy: .public) tty=\(String(describing: session.tty), privacy: .public) inTmux=\(session.isInTmux) inZellij=\(session.isInZellij)")
         await FocusDiagnosticsStore.shared.record(
-            "SessionLauncher activate session=\(session.sessionId) provider=\(session.provider.rawValue) client=\(session.clientDisplayName) pid=\(session.pid.map(String.init) ?? "nil") tty=\(session.tty ?? "nil") inTmux=\(session.isInTmux) terminalBundle=\(session.clientInfo.terminalBundleIdentifier ?? "nil") terminalSession=\(session.clientInfo.terminalSessionIdentifier ?? "nil") iTermSession=\(session.clientInfo.iTermSessionIdentifier ?? "nil")"
+            "SessionLauncher activate session=\(session.sessionId) provider=\(session.provider.rawValue) client=\(session.clientDisplayName) pid=\(session.pid.map(String.init) ?? "nil") tty=\(session.tty ?? "nil") inTmux=\(session.isInTmux) inZellij=\(session.isInZellij) terminalBundle=\(session.clientInfo.terminalBundleIdentifier ?? "nil") terminalSession=\(session.clientInfo.terminalSessionIdentifier ?? "nil") iTermSession=\(session.clientInfo.iTermSessionIdentifier ?? "nil")"
         )
         let allowsAppFallback = allowsAppFallback(for: session)
 
@@ -41,6 +41,14 @@ actor SessionLauncher {
         if session.isInTmux, await activateTmuxSession(session) {
             Self.logger.debug("Activated tmux session \(session.sessionId, privacy: .public)")
             return true
+        }
+
+        if session.isInZellij {
+            // Unlike tmux, zellij exposes no client-to-OS-PID mapping we can
+            // walk to find the hosting terminal app, so this only switches
+            // the notch's target pane; the generic terminal-app activation
+            // steps below still do the actual window raise.
+            await focusZellijPaneIfPossible(session)
         }
 
         if session.isRemoteSession,
@@ -300,6 +308,18 @@ actor SessionLauncher {
         }
 
         return false
+    }
+
+    private func focusZellijPaneIfPossible(_ session: SessionState) async {
+        if let pid = session.pid,
+           let target = await ZellijController.shared.findZellijTarget(forClaudePid: pid) {
+            _ = await ZellijController.shared.switchToPane(target: target)
+            return
+        }
+
+        if let target = await ZellijController.shared.findZellijTarget(forWorkingDirectory: session.cwd) {
+            _ = await ZellijController.shared.switchToPane(target: target)
+        }
     }
 
     private func shouldPrioritizeAppNavigation(for session: SessionState) -> Bool {

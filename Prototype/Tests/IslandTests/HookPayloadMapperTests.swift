@@ -399,6 +399,30 @@ func mapsClaudeIDEAndRemoteContextFromEnvironment() throws {
 }
 
 @Test
+func mapsZellijTerminalContextFromEnvironment() throws {
+    let payload = """
+    {
+      "hook_event_name": "UserPromptSubmit",
+      "session_id": "zellij-1"
+    }
+    """.data(using: .utf8)!
+
+    let envelope = HookPayloadMapper.makeEnvelope(
+        source: .claude,
+        arguments: ["island-bridge", "--source", "claude"],
+        environment: [
+            "PWD": "/tmp/demo",
+            "ZELLIJ_SESSION_NAME": "polished-orange",
+            "ZELLIJ_PANE_ID": "3"
+        ],
+        stdinData: payload
+    )
+
+    #expect(envelope.terminalContext.zellijSession == "polished-orange")
+    #expect(envelope.terminalContext.zellijPane == "3")
+}
+
+@Test
 func recoversCursorWorkspaceFromAgentTranscriptPathWhenPWDIsClientConfig() throws {
     let tempRoot = FileManager.default.temporaryDirectory
         .appendingPathComponent("pingislandcursor\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))", isDirectory: true)

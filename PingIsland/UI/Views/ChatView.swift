@@ -388,7 +388,7 @@ struct ChatView: View {
 
     /// Inline follow-up is available for native runtime sessions and terminal-backed tmux sessions.
     private var canSendMessages: Bool {
-        session.isNativeRuntimeSession || session.supportsTmuxCLIMessaging
+        session.isNativeRuntimeSession || session.supportsCLIMessaging
     }
 
     private var messagePlaceholder: String {
@@ -471,7 +471,7 @@ struct ChatView: View {
                 .padding(.vertical, 9)
                 .background(Capsule().fill(Color.white.opacity(0.9)))
 
-                if session.isInTmux {
+                if (session.isInTmux || session.isInZellij) {
                     Button {
                         focusTerminal()
                     } label: {
@@ -568,7 +568,7 @@ struct ChatView: View {
             } else if intervention.supportsInlineResponse {
                 let secondaryActionTitle: String? = if session.clientInfo.prefersAnsweredQuestionFollowupAction {
                     AppLocalization.format("打开 %@", session.interactionDisplayName)
-                } else if session.isInTmux {
+                } else if (session.isInTmux || session.isInZellij) {
                     AppLocalization.string("打开终端")
                 } else {
                     nil
@@ -576,7 +576,7 @@ struct ChatView: View {
 
                 let onSecondaryAction: (() -> Void)? = if session.clientInfo.prefersAnsweredQuestionFollowupAction {
                     { openClientApplication() }
-                } else if session.isInTmux {
+                } else if (session.isInTmux || session.isInZellij) {
                     { focusTerminal() }
                 } else {
                     nil
@@ -624,7 +624,7 @@ struct ChatView: View {
                     .padding(.vertical, 9)
                     .background(Capsule().fill(Color.white.opacity(0.9)))
 
-                    if session.isInTmux {
+                    if (session.isInTmux || session.isInZellij) {
                         Button {
                             focusTerminal()
                         }
@@ -660,7 +660,7 @@ struct ChatView: View {
     private var terminalRoutedPromptNotice: some View {
         Text(verbatim: AppLocalization.format(
             "已保留在%@中处理。Ping Island 只提醒，不接管此处响应。",
-            session.isInTmux ? AppLocalization.string("终端") : session.interactionDisplayName
+            (session.isInTmux || session.isInZellij) ? AppLocalization.string("终端") : session.interactionDisplayName
         ))
         .font(.system(size: 11, weight: .medium))
         .foregroundColor(.white.opacity(0.62))
@@ -768,6 +768,7 @@ private extension SessionState {
             && pid == other.pid
             && tty == other.tty
             && isInTmux == other.isInTmux
+            && isInZellij == other.isInZellij
             && autoApprovePermissions == other.autoApprovePermissions
     }
 }

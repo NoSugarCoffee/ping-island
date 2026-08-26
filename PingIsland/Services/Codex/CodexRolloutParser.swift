@@ -634,6 +634,8 @@ actor CodexRolloutParser {
             iTermSessionIdentifier: normalizedClientInfo?.iTermSessionIdentifier,
             tmuxSessionIdentifier: normalizedClientInfo?.tmuxSessionIdentifier,
             tmuxPaneIdentifier: normalizedClientInfo?.tmuxPaneIdentifier,
+            zellijSessionIdentifier: normalizedClientInfo?.zellijSessionIdentifier,
+            zellijPaneIdentifier: normalizedClientInfo?.zellijPaneIdentifier,
             processName: normalizedClientInfo?.processName
         ))
 

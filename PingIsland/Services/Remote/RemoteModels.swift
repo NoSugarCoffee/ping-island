@@ -362,6 +362,8 @@ struct RemoteHookClientInfoPayload: Codable, Sendable {
     let iTermSessionIdentifier: String?
     let tmuxSessionIdentifier: String?
     let tmuxPaneIdentifier: String?
+    let zellijSessionIdentifier: String?
+    let zellijPaneIdentifier: String?
     let processName: String?
 }
 

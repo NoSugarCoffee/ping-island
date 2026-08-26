@@ -376,6 +376,8 @@ private enum BridgeDebugLogger {
         "ITERM_SESSION_ID",
         "TMUX",
         "TMUX_PANE",
+        "ZELLIJ_SESSION_NAME",
+        "ZELLIJ_PANE_ID",
         "TTY",
         "__CFBundleIdentifier",
         "CLAUDE_SESSION_ID",
@@ -1464,6 +1466,8 @@ private struct RemoteHookClientInfoPayload: Codable {
     let iTermSessionIdentifier: String?
     let tmuxSessionIdentifier: String?
     let tmuxPaneIdentifier: String?
+    let zellijSessionIdentifier: String?
+    let zellijPaneIdentifier: String?
     let processName: String?
 }
 
@@ -1554,6 +1558,8 @@ private enum RemoteBridgeMessageBuilder {
                 iTermSessionIdentifier: terminalContext.iTermSessionID,
                 tmuxSessionIdentifier: terminalContext.tmuxSession,
                 tmuxPaneIdentifier: terminalContext.tmuxPane,
+                zellijSessionIdentifier: terminalContext.zellijSession,
+                zellijPaneIdentifier: terminalContext.zellijPane,
                 processName: firstNonEmpty(metadata["source_process_name"], metadata["process_name"])
             )
         )
@@ -1594,6 +1600,8 @@ private enum RemoteBridgeMessageBuilder {
                 iTermSessionIdentifier: nil,
                 tmuxSessionIdentifier: nil,
                 tmuxPaneIdentifier: nil,
+                zellijSessionIdentifier: nil,
+                zellijPaneIdentifier: nil,
                 processName: "codex app-server"
             )
         )
