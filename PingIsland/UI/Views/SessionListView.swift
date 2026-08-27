@@ -1399,7 +1399,7 @@ struct InstanceRow: View {
                     .buttonStyle(.plain)
                 }
 
-                if session.isInTmux && isYabaiAvailable {
+                if (session.isInTmux || session.isInZellij) && isYabaiAvailable {
                     IconButton(icon: "terminal") {
                         onFocus()
                     }
@@ -1419,7 +1419,7 @@ struct InstanceRow: View {
                     onChat()
                 }
 
-                if session.isInTmux && isYabaiAvailable {
+                if (session.isInTmux || session.isInZellij) && isYabaiAvailable {
                     IconButton(icon: "eye") {
                         onFocus()
                     }

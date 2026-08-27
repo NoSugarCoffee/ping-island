@@ -679,7 +679,9 @@ public enum HookPayloadMapper {
             transport: remoteContext.transport,
             remoteHost: remoteContext.remoteHost,
             tmuxSession: environment["TMUX"],
-            tmuxPane: environment["TMUX_PANE"]
+            tmuxPane: environment["TMUX_PANE"],
+            zellijSession: environment["ZELLIJ_SESSION_NAME"],
+            zellijPane: environment["ZELLIJ_PANE_ID"]
         )
     }
 

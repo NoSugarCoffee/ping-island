@@ -75,6 +75,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
     var appLaunchCount: Int = 0
     var sessionCount: Int = 0
     var tmuxSessionCount: Int = 0
+    var zellijSessionCount: Int = 0
     var clientSessionCounts: [String: Int] = [:]
     var providerSessionCounts: [String: Int] = [:]
     var settingChangeCounts: [String: Int] = [:]
@@ -84,6 +85,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
         appLaunchCount > 0
             || sessionCount > 0
             || tmuxSessionCount > 0
+            || zellijSessionCount > 0
             || !clientSessionCounts.isEmpty
             || !providerSessionCounts.isEmpty
             || !settingChangeCounts.isEmpty
@@ -93,6 +95,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
         case appLaunchCount
         case sessionCount
         case tmuxSessionCount
+        case zellijSessionCount
         case clientSessionCounts
         case providerSessionCounts
         case settingChangeCounts
@@ -103,6 +106,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
         appLaunchCount: Int = 0,
         sessionCount: Int = 0,
         tmuxSessionCount: Int = 0,
+        zellijSessionCount: Int = 0,
         clientSessionCounts: [String: Int] = [:],
         providerSessionCounts: [String: Int] = [:],
         settingChangeCounts: [String: Int] = [:],
@@ -111,6 +115,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
         self.appLaunchCount = appLaunchCount
         self.sessionCount = sessionCount
         self.tmuxSessionCount = tmuxSessionCount
+        self.zellijSessionCount = zellijSessionCount
         self.clientSessionCounts = clientSessionCounts
         self.providerSessionCounts = providerSessionCounts
         self.settingChangeCounts = settingChangeCounts
@@ -122,6 +127,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
         appLaunchCount = try container.decodeIfPresent(Int.self, forKey: .appLaunchCount) ?? 0
         sessionCount = try container.decodeIfPresent(Int.self, forKey: .sessionCount) ?? 0
         tmuxSessionCount = try container.decodeIfPresent(Int.self, forKey: .tmuxSessionCount) ?? 0
+        zellijSessionCount = try container.decodeIfPresent(Int.self, forKey: .zellijSessionCount) ?? 0
         clientSessionCounts = try container.decodeIfPresent([String: Int].self, forKey: .clientSessionCounts) ?? [:]
         providerSessionCounts = try container.decodeIfPresent([String: Int].self, forKey: .providerSessionCounts) ?? [:]
         settingChangeCounts = try container.decodeIfPresent([String: Int].self, forKey: .settingChangeCounts) ?? [:]
@@ -133,6 +139,7 @@ private struct TelemetryDailyAggregate: Codable, Equatable, Sendable {
         try container.encode(appLaunchCount, forKey: .appLaunchCount)
         try container.encode(sessionCount, forKey: .sessionCount)
         try container.encode(tmuxSessionCount, forKey: .tmuxSessionCount)
+        try container.encode(zellijSessionCount, forKey: .zellijSessionCount)
         try container.encode(clientSessionCounts, forKey: .clientSessionCounts)
         try container.encode(providerSessionCounts, forKey: .providerSessionCounts)
         try container.encode(settingChangeCounts, forKey: .settingChangeCounts)
@@ -202,6 +209,7 @@ actor TelemetryService {
     private var flushLoop: Task<Void, Never>?
     private var recordedSessionIDs: Set<String> = []
     private var recordedTmuxSessionIDs: Set<String> = []
+    private var recordedZellijSessionIDs: Set<String> = []
 
     init(
         configuration: TelemetryConfiguration = TelemetryConfiguration(),
@@ -251,6 +259,7 @@ actor TelemetryService {
             queue.removeAll()
             recordedSessionIDs.removeAll()
             recordedTmuxSessionIDs.removeAll()
+            recordedZellijSessionIDs.removeAll()
             clearStoredTelemetryAggregates()
             defaults.removeObject(forKey: TelemetryConsent.anonymousIDKey)
         }
@@ -329,11 +338,13 @@ actor TelemetryService {
             aggregate.surfaceMode = currentSurfaceMode()
         }
         recordTmuxSessionIfNeeded(session)
+        recordZellijSessionIfNeeded(session)
         await uploadPendingDailyUsageSnapshots()
     }
 
     func recordSessionCompleted(_ session: SessionState) async {
         recordTmuxSessionIfNeeded(session)
+        recordZellijSessionIfNeeded(session)
         await uploadPendingDailyUsageSnapshots()
     }
 
@@ -444,6 +455,7 @@ actor TelemetryService {
                 "client_session_counts",
                 "provider_session_counts",
                 "tmux_session_count",
+                "zellij_session_count",
                 "setting_change_counts"
             ]
         case .settingChanged:
@@ -501,10 +513,25 @@ actor TelemetryService {
         }
     }
 
+    private func recordZellijSessionIfNeeded(_ session: SessionState) {
+        guard hasZellijEvidence(session) else { return }
+        guard recordUniqueZellijSession(session.sessionId) else { return }
+        mutateAggregateForToday { aggregate in
+            aggregate.zellijSessionCount += 1
+            aggregate.surfaceMode = currentSurfaceMode()
+        }
+    }
+
     private func hasTmuxEvidence(_ session: SessionState) -> Bool {
         session.isInTmux
             || hasContent(session.clientInfo.tmuxPaneIdentifier)
             || hasContent(session.clientInfo.tmuxSessionIdentifier)
+    }
+
+    private func hasZellijEvidence(_ session: SessionState) -> Bool {
+        session.isInZellij
+            || hasContent(session.clientInfo.zellijPaneIdentifier)
+            || hasContent(session.clientInfo.zellijSessionIdentifier)
     }
 
     private func hasContent(_ value: String?) -> Bool {
@@ -617,6 +644,7 @@ actor TelemetryService {
                 "client_session_counts": compactCounts(aggregate.clientSessionCounts),
                 "provider_session_counts": compactCounts(aggregate.providerSessionCounts),
                 "tmux_session_count": "\(aggregate.tmuxSessionCount)",
+                "zellij_session_count": "\(aggregate.zellijSessionCount)",
                 "setting_change_counts": compactCounts(aggregate.settingChangeCounts),
                 "surface_mode": aggregate.surfaceMode
             ].merging(commonFields(), uniquingKeysWith: { current, _ in current })
@@ -674,6 +702,12 @@ actor TelemetryService {
     private func recordUniqueTmuxSession(_ sessionID: String) -> Bool {
         guard insertDailyUniqueValue(sessionID, namespace: "telemetryDailyTmuxSessionIDs") else { return false }
         recordedTmuxSessionIDs.insert(sessionID)
+        return true
+    }
+
+    private func recordUniqueZellijSession(_ sessionID: String) -> Bool {
+        guard insertDailyUniqueValue(sessionID, namespace: "telemetryDailyZellijSessionIDs") else { return false }
+        recordedZellijSessionIDs.insert(sessionID)
         return true
     }
 

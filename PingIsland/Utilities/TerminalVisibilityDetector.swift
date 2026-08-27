@@ -51,10 +51,14 @@ struct TerminalVisibilityDetector {
 
         let tree = ProcessTreeBuilder.shared.buildTree()
         let isInTmux = ProcessTreeBuilder.shared.isInTmux(pid: sessionPid, tree: tree)
+        let isInZellij = ProcessTreeBuilder.shared.isInZellij(pid: sessionPid, tree: tree)
 
         if isInTmux {
             // For tmux sessions, check if the session's pane is active
             return await TmuxTargetFinder.shared.isSessionPaneActive(claudePid: sessionPid)
+        } else if isInZellij {
+            // For zellij sessions, check if the session's pane is focused
+            return await ZellijTargetFinder.shared.isSessionPaneActive(claudePid: sessionPid)
         } else {
             // For non-tmux sessions, check if the session's terminal app is frontmost
             let sessionInfo = tree[sessionPid]

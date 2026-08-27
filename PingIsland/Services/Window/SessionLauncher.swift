@@ -27,9 +27,9 @@ actor SessionLauncher {
         guard !session.clientInfo.suppressesActivationNavigation else {
             return false
         }
-        Self.logger.debug("Activate request session=\(session.sessionId, privacy: .public) provider=\(String(describing: session.provider), privacy: .public) client=\(session.clientDisplayName, privacy: .public) pid=\(String(describing: session.pid), privacy: .public) tty=\(String(describing: session.tty), privacy: .public) inTmux=\(session.isInTmux)")
+        Self.logger.debug("Activate request session=\(session.sessionId, privacy: .public) provider=\(String(describing: session.provider), privacy: .public) client=\(session.clientDisplayName, privacy: .public) pid=\(String(describing: session.pid), privacy: .public) tty=\(String(describing: session.tty), privacy: .public) inTmux=\(session.isInTmux) inZellij=\(session.isInZellij)")
         await FocusDiagnosticsStore.shared.record(
-            "SessionLauncher activate session=\(session.sessionId) provider=\(session.provider.rawValue) client=\(session.clientDisplayName) pid=\(session.pid.map(String.init) ?? "nil") tty=\(session.tty ?? "nil") inTmux=\(session.isInTmux) terminalBundle=\(session.clientInfo.terminalBundleIdentifier ?? "nil") terminalSession=\(session.clientInfo.terminalSessionIdentifier ?? "nil") iTermSession=\(session.clientInfo.iTermSessionIdentifier ?? "nil")"
+            "SessionLauncher activate session=\(session.sessionId) provider=\(session.provider.rawValue) client=\(session.clientDisplayName) pid=\(session.pid.map(String.init) ?? "nil") tty=\(session.tty ?? "nil") inTmux=\(session.isInTmux) inZellij=\(session.isInZellij) terminalBundle=\(session.clientInfo.terminalBundleIdentifier ?? "nil") terminalSession=\(session.clientInfo.terminalSessionIdentifier ?? "nil") iTermSession=\(session.clientInfo.iTermSessionIdentifier ?? "nil")"
         )
         let allowsAppFallback = allowsAppFallback(for: session)
 
@@ -40,6 +40,11 @@ actor SessionLauncher {
 
         if session.isInTmux, await activateTmuxSession(session) {
             Self.logger.debug("Activated tmux session \(session.sessionId, privacy: .public)")
+            return true
+        }
+
+        if session.isInZellij, await activateZellijSession(session) {
+            Self.logger.debug("Activated zellij session \(session.sessionId, privacy: .public)")
             return true
         }
 
@@ -296,6 +301,39 @@ actor SessionLauncher {
                 return await activateApplication(processIdentifier: terminalPid, activateAllWindows: false)
             }
 
+            return true
+        }
+
+        return false
+    }
+
+    private func activateZellijSession(_ session: SessionState) async -> Bool {
+        if await WindowFinder.shared.isYabaiAvailable() {
+            if let pid = session.pid,
+               await YabaiController.shared.focusWindow(forZellijClaudePid: pid) {
+                return true
+            }
+
+            if await YabaiController.shared.focusWindow(forZellijWorkingDirectory: session.cwd) {
+                return true
+            }
+        }
+
+        let tree = ProcessTreeBuilder.shared.buildTree()
+
+        if let pid = session.pid,
+           let target = await ZellijController.shared.findZellijTarget(forClaudePid: pid) {
+            _ = await ZellijController.shared.switchToPane(target: target)
+
+            if let terminalPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree) {
+                return await activateApplication(processIdentifier: terminalPid, activateAllWindows: false)
+            }
+
+            return true
+        }
+
+        if let target = await ZellijController.shared.findZellijTarget(forWorkingDirectory: session.cwd) {
+            _ = await ZellijController.shared.switchToPane(target: target)
             return true
         }
 

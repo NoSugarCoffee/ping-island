@@ -178,7 +178,7 @@ struct CodexSessionView: View {
     private var terminalRoutedPromptNotice: some View {
         Text(verbatim: AppLocalization.format(
             "已保留在%@中处理。Ping Island 只提醒，不接管此处响应。",
-            session.isInTmux ? AppLocalization.string("终端") : session.interactionDisplayName
+            (session.isInTmux || session.isInZellij) ? AppLocalization.string("终端") : session.interactionDisplayName
         ))
         .font(.system(size: 12, weight: .medium))
         .foregroundColor(.white.opacity(0.66))
@@ -341,7 +341,7 @@ struct CodexThreadInspectorView: View {
         guard session.intervention == nil else { return false }
         return session.clientInfo.kind == .codexCLI
             || session.isNativeRuntimeSession
-            || session.supportsTmuxCLIMessaging
+            || session.supportsCLIMessaging
     }
 
     private var followUpPlaceholder: String {

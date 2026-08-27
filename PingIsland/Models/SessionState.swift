@@ -67,6 +67,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
     var pid: Int?
     var tty: String?
     var isInTmux: Bool
+    var isInZellij: Bool
     var autoApprovePermissions: Bool
 
     // MARK: - State Machine
@@ -137,6 +138,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         pid: Int? = nil,
         tty: String? = nil,
         isInTmux: Bool = false,
+        isInZellij: Bool = false,
         autoApprovePermissions: Bool = false,
         phase: SessionPhase = .idle,
         chatItems: [ChatHistoryItem] = [],
@@ -173,6 +175,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.pid = pid
         self.tty = tty
         self.isInTmux = isInTmux
+        self.isInZellij = isInZellij
         self.autoApprovePermissions = autoApprovePermissions
         self.phase = phase
         self.chatItems = chatItems
@@ -1071,8 +1074,12 @@ struct SessionState: Equatable, Identifiable, Sendable {
         ingress == .nativeRuntime
     }
 
-    nonisolated var supportsTmuxCLIMessaging: Bool {
-        guard hasTmuxRoutingEvidence else { return false }
+    /// Whether the notch can inject a free-text follow-up message into this
+    /// session's terminal. Named generically because it now covers any
+    /// supported multiplexer (tmux or zellij) that lets us write keystrokes
+    /// directly into the pane -- see ZellijApprovalHandler/ToolApprovalHandler.
+    nonisolated var supportsCLIMessaging: Bool {
+        guard hasTmuxRoutingEvidence || hasZellijRoutingEvidence else { return false }
 
         switch provider {
         case .claude:
@@ -1103,6 +1110,12 @@ struct SessionState: Equatable, Identifiable, Sendable {
         isInTmux
             || Self.hasContent(clientInfo.tmuxPaneIdentifier)
             || Self.hasContent(clientInfo.tmuxSessionIdentifier)
+    }
+
+    private nonisolated var hasZellijRoutingEvidence: Bool {
+        isInZellij
+            || Self.hasContent(clientInfo.zellijPaneIdentifier)
+            || Self.hasContent(clientInfo.zellijSessionIdentifier)
     }
 
     private nonisolated static func hasContent(_ value: String?) -> Bool {
@@ -1262,6 +1275,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
             normalized(clientInfo.iTermSessionIdentifier).map { "itermSession:\($0)" },
             normalized(clientInfo.tmuxSessionIdentifier).map { "tmuxSession:\($0)" },
             normalized(clientInfo.tmuxPaneIdentifier).map { "tmuxPane:\($0)" },
+            normalized(clientInfo.zellijSessionIdentifier).map { "zellijSession:\($0)" },
+            normalized(clientInfo.zellijPaneIdentifier).map { "zellijPane:\($0)" },
             normalized(clientInfo.processName).map { "process:\($0)" }
         ].compactMap { $0 })
     }
@@ -1282,7 +1297,9 @@ struct SessionState: Equatable, Identifiable, Sendable {
             normalized(clientInfo.terminalSessionIdentifier).map { "terminalSession:\($0)" },
             normalized(clientInfo.iTermSessionIdentifier).map { "itermSession:\($0)" },
             normalized(clientInfo.tmuxSessionIdentifier).map { "tmuxSession:\($0)" },
-            normalized(clientInfo.tmuxPaneIdentifier).map { "tmuxPane:\($0)" }
+            normalized(clientInfo.tmuxPaneIdentifier).map { "tmuxPane:\($0)" },
+            normalized(clientInfo.zellijSessionIdentifier).map { "zellijSession:\($0)" },
+            normalized(clientInfo.zellijPaneIdentifier).map { "zellijPane:\($0)" }
         ].compactMap { $0 })
     }
 }

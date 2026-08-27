@@ -54,6 +54,8 @@ public struct TerminalContext: Codable, Equatable, Hashable, Sendable {
     public var remoteHost: String?
     public var tmuxSession: String?
     public var tmuxPane: String?
+    public var zellijSession: String?
+    public var zellijPane: String?
 
     public init(
         terminalProgram: String? = nil,
@@ -67,7 +69,9 @@ public struct TerminalContext: Codable, Equatable, Hashable, Sendable {
         transport: String? = nil,
         remoteHost: String? = nil,
         tmuxSession: String? = nil,
-        tmuxPane: String? = nil
+        tmuxPane: String? = nil,
+        zellijSession: String? = nil,
+        zellijPane: String? = nil
     ) {
         self.terminalProgram = terminalProgram
         self.terminalBundleID = terminalBundleID
@@ -81,6 +85,8 @@ public struct TerminalContext: Codable, Equatable, Hashable, Sendable {
         self.remoteHost = remoteHost
         self.tmuxSession = tmuxSession
         self.tmuxPane = tmuxPane
+        self.zellijSession = zellijSession
+        self.zellijPane = zellijPane
     }
 }
 

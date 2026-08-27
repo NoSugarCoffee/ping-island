@@ -415,6 +415,8 @@ private struct BridgeTerminalContext: Codable, Sendable {
     let remoteHost: String?
     let tmuxSession: String?
     let tmuxPane: String?
+    let zellijSession: String?
+    let zellijPane: String?
 }
 
 private struct BridgeEnvelope: Decodable, Sendable {
@@ -474,7 +476,9 @@ private struct BridgeEnvelope: Decodable, Sendable {
                 transport: nil,
                 remoteHost: nil,
                 tmuxSession: nil,
-                tmuxPane: nil
+                tmuxPane: nil,
+                zellijSession: nil,
+                zellijPane: nil
             )
         intervention = try container.decodeIfPresent(BridgeEnvelopeIntervention.self, forKey: .intervention)
 
@@ -1026,6 +1030,8 @@ private extension BridgeEnvelope {
             iTermSessionIdentifier: terminalContext.iTermSessionID,
             tmuxSessionIdentifier: terminalContext.tmuxSession,
             tmuxPaneIdentifier: terminalContext.tmuxPane,
+            zellijSessionIdentifier: terminalContext.zellijSession,
+            zellijPaneIdentifier: terminalContext.zellijPane,
             processName: processName
         )
     }

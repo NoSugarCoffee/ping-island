@@ -609,6 +609,8 @@ final class RemoteConnectorManager: ObservableObject {
                 iTermSessionIdentifier: payload.clientInfo.iTermSessionIdentifier,
                 tmuxSessionIdentifier: payload.clientInfo.tmuxSessionIdentifier,
                 tmuxPaneIdentifier: payload.clientInfo.tmuxPaneIdentifier,
+                zellijSessionIdentifier: payload.clientInfo.zellijSessionIdentifier,
+                zellijPaneIdentifier: payload.clientInfo.zellijPaneIdentifier,
                 processName: payload.clientInfo.processName
             )
 

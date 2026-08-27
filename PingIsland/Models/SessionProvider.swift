@@ -58,6 +58,8 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
     var iTermSessionIdentifier: String?
     var tmuxSessionIdentifier: String?
     var tmuxPaneIdentifier: String?
+    var zellijSessionIdentifier: String?
+    var zellijPaneIdentifier: String?
     var processName: String?
 
     nonisolated init(
@@ -78,6 +80,8 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         iTermSessionIdentifier: String? = nil,
         tmuxSessionIdentifier: String? = nil,
         tmuxPaneIdentifier: String? = nil,
+        zellijSessionIdentifier: String? = nil,
+        zellijPaneIdentifier: String? = nil,
         processName: String? = nil
     ) {
         self.kind = kind
@@ -97,6 +101,8 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         self.iTermSessionIdentifier = iTermSessionIdentifier?.nonEmpty
         self.tmuxSessionIdentifier = tmuxSessionIdentifier?.nonEmpty
         self.tmuxPaneIdentifier = tmuxPaneIdentifier?.nonEmpty
+        self.zellijSessionIdentifier = zellijSessionIdentifier?.nonEmpty
+        self.zellijPaneIdentifier = zellijPaneIdentifier?.nonEmpty
         self.processName = processName?.nonEmpty
     }
 
@@ -574,6 +580,8 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             || normalized.iTermSessionIdentifier?.nonEmpty != nil
             || normalized.tmuxSessionIdentifier?.nonEmpty != nil
             || normalized.tmuxPaneIdentifier?.nonEmpty != nil
+            || normalized.zellijSessionIdentifier?.nonEmpty != nil
+            || normalized.zellijPaneIdentifier?.nonEmpty != nil
         let isExplicitCLIOrigin = normalizedOrigin == "cli" || normalizedThreadSource == "cli"
 
         if normalized.kind == .codexCLI,
@@ -809,7 +817,8 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
                 bundleIdentifier: terminalBundleIdentifier,
                 program: terminalProgram
             ),
-            tmuxPaneIdentifier
+            tmuxPaneIdentifier,
+            zellijPaneIdentifier
         ])
 
         guard !parts.isEmpty else { return nil }
@@ -870,6 +879,12 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         }
         if let tmuxPaneIdentifier = newer.tmuxPaneIdentifier?.nonEmpty {
             merged.tmuxPaneIdentifier = tmuxPaneIdentifier
+        }
+        if let zellijSessionIdentifier = newer.zellijSessionIdentifier?.nonEmpty {
+            merged.zellijSessionIdentifier = zellijSessionIdentifier
+        }
+        if let zellijPaneIdentifier = newer.zellijPaneIdentifier?.nonEmpty {
+            merged.zellijPaneIdentifier = zellijPaneIdentifier
         }
         if let processName = newer.processName?.nonEmpty {
             merged.processName = processName
