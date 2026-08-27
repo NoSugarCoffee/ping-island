@@ -60,6 +60,11 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
     var tmuxPaneIdentifier: String?
     var zellijSessionIdentifier: String?
     var zellijPaneIdentifier: String?
+    /// kitty's per-OS-window id (KITTY_WINDOW_ID). kitty runs one process for
+    /// every window it owns, so NSRunningApplication-level activation can't
+    /// tell them apart; this lets SessionLauncher target the exact window
+    /// via kitty's remote-control protocol instead of guessing by title/cwd.
+    var kittyWindowIdentifier: String?
     var processName: String?
 
     nonisolated init(
@@ -82,6 +87,7 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         tmuxPaneIdentifier: String? = nil,
         zellijSessionIdentifier: String? = nil,
         zellijPaneIdentifier: String? = nil,
+        kittyWindowIdentifier: String? = nil,
         processName: String? = nil
     ) {
         self.kind = kind
@@ -103,6 +109,7 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         self.tmuxPaneIdentifier = tmuxPaneIdentifier?.nonEmpty
         self.zellijSessionIdentifier = zellijSessionIdentifier?.nonEmpty
         self.zellijPaneIdentifier = zellijPaneIdentifier?.nonEmpty
+        self.kittyWindowIdentifier = kittyWindowIdentifier?.nonEmpty
         self.processName = processName?.nonEmpty
     }
 
@@ -885,6 +892,9 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         }
         if let zellijPaneIdentifier = newer.zellijPaneIdentifier?.nonEmpty {
             merged.zellijPaneIdentifier = zellijPaneIdentifier
+        }
+        if let kittyWindowIdentifier = newer.kittyWindowIdentifier?.nonEmpty {
+            merged.kittyWindowIdentifier = kittyWindowIdentifier
         }
         if let processName = newer.processName?.nonEmpty {
             merged.processName = processName

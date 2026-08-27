@@ -269,6 +269,21 @@ actor SessionLauncher {
         return false
     }
 
+    /// Prefer kitty's remote-control protocol when we know the exact OS
+    /// window id -- kitty runs a single process for every window it owns,
+    /// so activateApplication's NSRunningApplication-level activation can
+    /// only raise "some" kitty window, not necessarily the one attached to
+    /// the multiplexer pane that was just switched to.
+    private func raiseTerminalWindow(for session: SessionState, fallbackTerminalPid: Int?) async -> Bool {
+        if let kittyWindowID = session.clientInfo.kittyWindowIdentifier,
+           await KittyController.shared.focusWindow(kittyWindowID: kittyWindowID) {
+            return true
+        }
+
+        guard let fallbackTerminalPid else { return false }
+        return await activateApplication(processIdentifier: fallbackTerminalPid, activateAllWindows: false)
+    }
+
     private func activateTmuxSession(_ session: SessionState) async -> Bool {
         if await WindowFinder.shared.isYabaiAvailable() {
             if let pid = session.pid,
@@ -286,22 +301,20 @@ actor SessionLauncher {
         if let pid = session.pid,
            let target = await TmuxController.shared.findTmuxTarget(forClaudePid: pid) {
             _ = await TmuxController.shared.switchToPane(target: target)
-
-            if let terminalPid = await findTmuxClientTerminal(forSession: target.session, tree: tree) {
-                return await activateApplication(processIdentifier: terminalPid, activateAllWindows: false)
+            let fallbackTerminalPid = await findTmuxClientTerminal(forSession: target.session, tree: tree)
+            if await raiseTerminalWindow(for: session, fallbackTerminalPid: fallbackTerminalPid) {
+                return true
             }
-
-            return true
+            return fallbackTerminalPid == nil
         }
 
         if let target = await TmuxController.shared.findTmuxTarget(forWorkingDirectory: session.cwd) {
             _ = await TmuxController.shared.switchToPane(target: target)
-
-            if let terminalPid = await findTmuxClientTerminal(forSession: target.session, tree: tree) {
-                return await activateApplication(processIdentifier: terminalPid, activateAllWindows: false)
+            let fallbackTerminalPid = await findTmuxClientTerminal(forSession: target.session, tree: tree)
+            if await raiseTerminalWindow(for: session, fallbackTerminalPid: fallbackTerminalPid) {
+                return true
             }
-
-            return true
+            return fallbackTerminalPid == nil
         }
 
         return false
@@ -324,16 +337,16 @@ actor SessionLauncher {
         if let pid = session.pid,
            let target = await ZellijController.shared.findZellijTarget(forClaudePid: pid) {
             _ = await ZellijController.shared.switchToPane(target: target)
-
-            if let terminalPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree) {
-                return await activateApplication(processIdentifier: terminalPid, activateAllWindows: false)
+            let fallbackTerminalPid = ProcessTreeBuilder.shared.findTerminalPid(forProcess: pid, tree: tree)
+            if await raiseTerminalWindow(for: session, fallbackTerminalPid: fallbackTerminalPid) {
+                return true
             }
-
-            return true
+            return fallbackTerminalPid == nil
         }
 
         if let target = await ZellijController.shared.findZellijTarget(forWorkingDirectory: session.cwd) {
             _ = await ZellijController.shared.switchToPane(target: target)
+            _ = await raiseTerminalWindow(for: session, fallbackTerminalPid: nil)
             return true
         }
 
