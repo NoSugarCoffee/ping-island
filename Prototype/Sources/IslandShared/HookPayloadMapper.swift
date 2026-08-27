@@ -681,7 +681,8 @@ public enum HookPayloadMapper {
             tmuxSession: environment["TMUX"],
             tmuxPane: environment["TMUX_PANE"],
             zellijSession: environment["ZELLIJ_SESSION_NAME"],
-            zellijPane: environment["ZELLIJ_PANE_ID"]
+            zellijPane: environment["ZELLIJ_PANE_ID"],
+            kittyWindowID: environment["KITTY_WINDOW_ID"]
         )
     }
 

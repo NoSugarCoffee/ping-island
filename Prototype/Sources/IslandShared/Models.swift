@@ -56,6 +56,7 @@ public struct TerminalContext: Codable, Equatable, Hashable, Sendable {
     public var tmuxPane: String?
     public var zellijSession: String?
     public var zellijPane: String?
+    public var kittyWindowID: String?
 
     public init(
         terminalProgram: String? = nil,
@@ -71,7 +72,8 @@ public struct TerminalContext: Codable, Equatable, Hashable, Sendable {
         tmuxSession: String? = nil,
         tmuxPane: String? = nil,
         zellijSession: String? = nil,
-        zellijPane: String? = nil
+        zellijPane: String? = nil,
+        kittyWindowID: String? = nil
     ) {
         self.terminalProgram = terminalProgram
         self.terminalBundleID = terminalBundleID
@@ -87,6 +89,7 @@ public struct TerminalContext: Codable, Equatable, Hashable, Sendable {
         self.tmuxPane = tmuxPane
         self.zellijSession = zellijSession
         self.zellijPane = zellijPane
+        self.kittyWindowID = kittyWindowID
     }
 }
 
