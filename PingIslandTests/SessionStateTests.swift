@@ -114,9 +114,9 @@ final class SessionStateTests: XCTestCase {
             )
         )
 
-        XCTAssertTrue(claudeSession.supportsTmuxCLIMessaging)
-        XCTAssertTrue(codexSession.supportsTmuxCLIMessaging)
-        XCTAssertTrue(qoderSession.supportsTmuxCLIMessaging)
+        XCTAssertTrue(claudeSession.supportsCLIMessaging)
+        XCTAssertTrue(codexSession.supportsCLIMessaging)
+        XCTAssertTrue(qoderSession.supportsCLIMessaging)
     }
 
     func testTmuxCLIMessagingRejectsDesktopOrHostedIDEClients() {
@@ -144,8 +144,8 @@ final class SessionStateTests: XCTestCase {
             )
         )
 
-        XCTAssertFalse(codexAppSession.supportsTmuxCLIMessaging)
-        XCTAssertFalse(qoderIDESession.supportsTmuxCLIMessaging)
+        XCTAssertFalse(codexAppSession.supportsCLIMessaging)
+        XCTAssertFalse(qoderIDESession.supportsCLIMessaging)
     }
 
     func testQoderAgentPrefixedDisplayTitleUsesCodexStyleSubagentRendering() {
